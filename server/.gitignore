@@ -1,0 +1,25 @@
+# Server .gitignore
+
+# Node
+node_modules/
+
+# Build / transpiled
+dist/
+
+# Env
+.env
+
+# Logs
+logs/
+*.log
+
+# Coverage
+coverage/
+
+# Uploads
+uploads/
+
+# Editor
+.vscode/
+.idea/
+.DS_Store
