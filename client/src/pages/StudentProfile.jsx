@@ -40,7 +40,7 @@ const StudentProfile = () => {
   );
 
   const { student, stats, rank, history } = data;
-  const onTimeRate = completionPercent(stats.onTimeCount, stats.completedCount);
+  const completionRate = completionPercent(stats.completedCount, stats.totalQuestions);
 
   return (
     <div style={{ maxWidth: 720, margin: '0 auto' }}>
@@ -76,12 +76,28 @@ const StudentProfile = () => {
         <div className="card-header"><span className="card-title">Statistics</span></div>
         <div className="stats-grid">
           <div className="stat-item">
+            <div className="stat-value">{stats.questionsPosted}</div>
+            <div className="stat-label">Questions Posted</div>
+          </div>
+          <div className="stat-item">
+            <div className="stat-value">{stats.completedCount}</div>
+            <div className="stat-label">Questions Completed</div>
+          </div>
+          <div className="stat-item">
+            <div className="stat-value">{stats.pendingCount}</div>
+            <div className="stat-label">Pending</div>
+          </div>
+          <div className="stat-item">
             <div className="stat-value">{stats.totalPoints}</div>
             <div className="stat-label">Total Points</div>
           </div>
           <div className="stat-item">
-            <div className="stat-value">{stats.completedCount}</div>
-            <div className="stat-label">Completed</div>
+            <div className="stat-value">{completionRate}%</div>
+            <div className="stat-label">Completion Rate</div>
+          </div>
+          <div className="stat-item">
+            <div className="stat-value">#{rank || '-'}</div>
+            <div className="stat-label">Current Rank</div>
           </div>
           <div className="stat-item">
             <div
@@ -106,11 +122,11 @@ const StudentProfile = () => {
         {stats.completedCount > 0 && (
           <div style={{ marginTop: 16 }}>
             <div className="flex justify-between text-xs text-muted" style={{ marginBottom: 6 }}>
-              <span>On-time rate</span>
-              <span className="text-green">{onTimeRate}%</span>
+              <span>Completion rate</span>
+              <span className="text-green">{completionRate}%</span>
             </div>
             <div className="progress-bar">
-              <div className="progress-fill" style={{ width: `${onTimeRate}%` }} />
+              <div className="progress-fill" style={{ width: `${completionRate}%` }} />
             </div>
           </div>
         )}
@@ -118,7 +134,7 @@ const StudentProfile = () => {
 
       {/* Problem history */}
       <div className="card">
-        <div className="card-header"><span className="card-title">Recent Problems</span></div>
+        <div className="card-header"><span className="card-title">Recent Activity</span></div>
 
         {history.length === 0 ? (
           <div className="empty-state" style={{ padding: '24px' }}>

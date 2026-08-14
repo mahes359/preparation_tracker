@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { problemsApi } from '../services/api';
 import { toApiDate } from '../utils/dateHelpers';
 
-const useProblems = (date) => {
+const useProblems = (date, studentId) => {
   const [problems, setProblems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -16,24 +16,42 @@ const useProblems = (date) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await problemsApi.getByDate(dateStr);
+      const res = await problemsApi.getByDate(dateStr, studentId);
       setProblems(res.data || []);
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, [dateStr]);
+  }, [dateStr, studentId]);
 
   useEffect(() => {
     fetchProblems();
   }, [fetchProblems]);
 
-  const completeProblem = useCallback(async (problemId) => {
-    const res = await problemsApi.complete(problemId);
-    setProblems((prev) =>
-      prev.map((p) => (p._id === problemId ? res.data : p))
-    );
+  const completeProblem = useCallback(async (problemId, studentId) => {
+    const res = await problemsApi.complete(problemId, studentId);
+    setProblems((prev) => prev.map((problem) => {
+      if (problem._id !== problemId) return problem;
+      const records = [...(problem.completions || [])];
+      const index = records.findIndex((progress) => progress.studentId?._id?.toString() === studentId.toString());
+      if (index >= 0) records[index] = res.data;
+      else records.push(res.data);
+      return { ...problem, completions: records };
+    }));
+    return res;
+  }, []);
+
+  const saveProgress = useCallback(async (problemId, studentId, note) => {
+    const res = await problemsApi.saveProgress(problemId, studentId, note);
+    setProblems((prev) => prev.map((problem) => {
+      if (problem._id !== problemId) return problem;
+      const records = [...(problem.completions || [])];
+      const index = records.findIndex((progress) => progress.studentId?._id?.toString() === studentId.toString());
+      if (index >= 0) records[index] = res.data;
+      else records.push(res.data);
+      return { ...problem, completions: records };
+    }));
     return res;
   }, []);
 
@@ -48,7 +66,7 @@ const useProblems = (date) => {
     setProblems((prev) => prev.filter((p) => p._id !== problemId));
   }, []);
 
-  return { problems, loading, error, refetch: fetchProblems, completeProblem, addProblem, removeProblem };
+  return { problems, loading, error, refetch: fetchProblems, completeProblem, saveProgress, addProblem, removeProblem };
 };
 
 export default useProblems;

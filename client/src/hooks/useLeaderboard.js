@@ -8,6 +8,7 @@ const useLeaderboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [asOf, setAsOf] = useState(null);
+  const [groupStats, setGroupStats] = useState(null);
 
   const fetchLeaderboard = useCallback(async () => {
     setLoading(true);
@@ -16,6 +17,7 @@ const useLeaderboard = () => {
       const res = await leaderboardApi.get();
       setRankings(res.data || []);
       setAsOf(res.asOf);
+      setGroupStats(res.groupStats || null);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -27,7 +29,12 @@ const useLeaderboard = () => {
     fetchLeaderboard();
   }, [fetchLeaderboard]);
 
-  return { rankings, loading, error, asOf, refetch: fetchLeaderboard };
+  useEffect(() => {
+    const interval = setInterval(fetchLeaderboard, 60000);
+    return () => clearInterval(interval);
+  }, [fetchLeaderboard]);
+
+  return { rankings, groupStats, loading, error, asOf, refetch: fetchLeaderboard };
 };
 
 export default useLeaderboard;

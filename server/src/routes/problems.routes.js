@@ -19,7 +19,8 @@ const createProblemSchema = z.object({
 router.get('/', ctrl.getProblems);
 router.post('/', validate(createProblemSchema), ctrl.createProblem);
 router.get('/:id', ctrl.getProblem);
-router.patch('/:id/complete', ctrl.completeProblem);
+router.patch('/:id/complete', validate(z.object({ studentId: z.string().length(24, 'Invalid student ID') })), ctrl.completeProblem);
+router.patch('/:id/progress', validate(z.object({ studentId: z.string().length(24, 'Invalid student ID'), note: z.string().max(2000) })), ctrl.saveProgressNote);
 router.delete('/:id', ctrl.deleteProblem);
 
 module.exports = router;

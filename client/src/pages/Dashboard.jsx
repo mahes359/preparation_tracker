@@ -1,7 +1,6 @@
 // src/pages/Dashboard.jsx
 // Main dashboard page: problems (left) + leaderboard & stats (right).
 
-import { useRef } from 'react';
 import { SignedOut, SignInButton } from '@clerk/clerk-react';
 import TodayProblems from '../components/dashboard/TodayProblems';
 import Leaderboard from '../components/leaderboard/Leaderboard';
@@ -9,8 +8,7 @@ import OverallStats from '../components/dashboard/OverallStats';
 import useLeaderboard from '../hooks/useLeaderboard';
 
 const Dashboard = () => {
-  const { rankings, refetch: refetchLeaderboard } = useLeaderboard();
-  const leaderboardRefreshRef = useRef(refetchLeaderboard);
+  const { rankings, groupStats, loading: leaderboardLoading, error: leaderboardError, refetch: refetchLeaderboard } = useLeaderboard();
 
   const handleProblemComplete = () => {
     refetchLeaderboard();
@@ -60,9 +58,9 @@ const Dashboard = () => {
         {/* Right: Leaderboard + Stats */}
         <div>
           <div className="card">
-            <Leaderboard onUpdate={leaderboardRefreshRef} />
+            <Leaderboard rankings={rankings} loading={leaderboardLoading} error={leaderboardError} onRefresh={refetchLeaderboard} />
           </div>
-          <OverallStats rankings={rankings} />
+          <OverallStats groupStats={groupStats} />
         </div>
       </div>
     </div>

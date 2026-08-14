@@ -10,7 +10,7 @@ const getScoringConfig = asyncHandler(async (req, res) => {
 });
 
 const updateScoringConfig = asyncHandler(async (req, res) => {
-  const { onTimePoints, latePoints, deadlineHourUTC, description } = req.body;
+  const { onTimePoints, latePoints, deadlineHour, deadlineMinute, description } = req.body;
 
   // Deactivate current config
   await ScoringConfig.updateMany({ isActive: true }, { isActive: false });
@@ -19,7 +19,8 @@ const updateScoringConfig = asyncHandler(async (req, res) => {
   const newConfig = await ScoringConfig.create({
     onTimePoints,
     latePoints,
-    deadlineHourUTC,
+    deadlineHour,
+    deadlineMinute,
     description,
     isActive: true,
   });

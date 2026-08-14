@@ -1,64 +1,75 @@
-// src/utils/dateUtils.js
-// All date arithmetic lives here — one place to fix timezone issues.
+const { APP_TIMEZONE } = require('../config/env');
 
-/**
- * Returns the UTC start-of-day (midnight) Date for a given date string or Date.
- * e.g. "2026-08-13" → 2026-08-13T00:00:00.000Z
- */
-const startOfDayUTC = (date) => {
-  const d = date ? new Date(date) : new Date();
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+const formatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: APP_TIMEZONE,
+  year: 'numeric', month: '2-digit', day: '2-digit',
+  hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+});
+
+const zonedParts = (date) => Object.fromEntries(
+  formatter.formatToParts(new Date(date))
+    .filter(({ type }) => type !== 'literal')
+    .map(({ type, value }) => [type, type === 'hour' && value === '24' ? 0 : Number(value)])
+);
+
+const dayKeyFor = (date = new Date()) => {
+  const { year, month, day } = zonedParts(date);
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 };
 
-/**
- * Returns the UTC start-of-day for TODAY.
- */
-const todayUTC = () => startOfDayUTC(new Date());
-
-/**
- * Returns the UTC end-of-day (just before midnight) for a given date.
- */
-const endOfDayUTC = (date) => {
-  const d = startOfDayUTC(date);
-  d.setUTCHours(23, 59, 59, 999);
-  return d;
+const parseDayKey = (value) => {
+  const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) throw new Error('Date must be in YYYY-MM-DD format');
+  const [, year, month, day] = match.map(Number);
+  const check = new Date(Date.UTC(year, month - 1, day));
+  if (check.getUTCFullYear() !== year || check.getUTCMonth() !== month - 1 || check.getUTCDate() !== day) {
+    throw new Error('Date must be a valid calendar day');
+  }
+  return { year, month, day };
 };
 
-/**
- * Builds the deadline Date for a problem posted on a given calendar date.
- * The deadline is {date} at {deadlineHourUTC}:59:59 UTC.
- * @param {Date|string} date - the calendar date of the problem
- * @param {number} deadlineHourUTC - hour in UTC (0-23)
- */
-const buildDeadline = (date, deadlineHourUTC) => {
-  const d = startOfDayUTC(date);
-  d.setUTCHours(deadlineHourUTC, 59, 59, 999);
-  return d;
+const zonedDateTime = (dayKey, hour = 0, minute = 0, second = 0, ms = 0) => {
+  const { year, month, day } = parseDayKey(dayKey);
+  const wallClock = Date.UTC(year, month - 1, day, hour, minute, second, ms);
+  let instant = wallClock;
+  for (let i = 0; i < 2; i += 1) {
+    const roundedInstant = Math.floor(instant / 1000) * 1000;
+    const parts = zonedParts(roundedInstant);
+    const offset = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second) - roundedInstant;
+    instant = wallClock - offset;
+  }
+  return new Date(instant);
 };
 
-/**
- * Returns a YYYY-MM-DD string for a Date (UTC).
- */
 const toDateString = (date) => {
-  const d = new Date(date);
-  return d.toISOString().split('T')[0];
+  if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) return date;
+  return dayKeyFor(date);
 };
 
-/**
- * Extracts problem title from a LeetCode URL slug.
- * e.g. "https://leetcode.com/problems/two-sum/" → "Two Sum"
- */
+const startOfDayUTC = (date) => zonedDateTime(toDateString(date || new Date()));
+const todayKey = () => dayKeyFor(new Date());
+const todayUTC = () => startOfDayUTC(todayKey());
+
+const endOfDayUTC = (date) => {
+  const { year, month, day } = parseDayKey(toDateString(date));
+  const nextKey = new Date(Date.UTC(year, month - 1, day + 1)).toISOString().slice(0, 10);
+  return new Date(zonedDateTime(nextKey).getTime() - 1);
+};
+
+const buildDeadline = (date, deadlineHour, deadlineMinute = 59) =>
+  zonedDateTime(toDateString(date), deadlineHour, deadlineMinute, 59, 999);
+
 const titleFromUrl = (url) => {
   try {
     const match = url.match(/\/problems\/([^/]+)/);
     if (!match) return '';
-    return match[1]
-      .split('-')
-      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-      .join(' ');
+    return match[1].split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
   } catch {
     return '';
   }
 };
 
-module.exports = { startOfDayUTC, todayUTC, endOfDayUTC, buildDeadline, toDateString, titleFromUrl };
+module.exports = {
+  APP_TIMEZONE, startOfDayUTC, todayUTC, todayKey, endOfDayUTC,
+  buildDeadline, toDateString, titleFromUrl,
+};

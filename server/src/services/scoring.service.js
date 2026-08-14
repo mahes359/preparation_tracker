@@ -10,13 +10,13 @@ const ScoringConfig = require('../models/ScoringConfig');
  */
 const getActiveConfig = async () => {
   const config = await ScoringConfig.findOne({ isActive: true }).lean();
-  return (
-    config || {
-      onTimePoints: 10,
-      latePoints: 5,
-      deadlineHourUTC: 18,
-    }
-  );
+  return {
+    onTimePoints: config?.onTimePoints ?? 10,
+    latePoints: config?.latePoints ?? 5,
+    deadlineHour: config?.deadlineHour ?? 23,
+    deadlineMinute: config?.deadlineMinute ?? 59,
+    ...(config || {}),
+  };
 };
 
 /**

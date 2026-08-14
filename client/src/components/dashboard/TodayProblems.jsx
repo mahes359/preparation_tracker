@@ -1,7 +1,7 @@
 // src/components/dashboard/TodayProblems.jsx
 // Main problem list panel with day selector and add button.
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import { useApp } from '../../context/AppContext';
 import ProblemCard from './ProblemCard';
@@ -13,15 +13,26 @@ import { getToday } from '../../utils/dateHelpers';
 
 const TodayProblems = ({ onProblemComplete }) => {
   const [selectedDate, setSelectedDate] = useState(getToday());
+  const lastTodayRef = useRef(getToday());
   const [showModal, setShowModal] = useState(false);
   const { addToast, state } = useApp();
   const { isSignedIn } = useAuth();
   const { currentStudent } = state;
 
-  const { problems, loading, error, completeProblem, addProblem, removeProblem } =
-    useProblems(selectedDate);
+  const { problems, loading, error, completeProblem, saveProgress, addProblem, removeProblem } =
+    useProblems(selectedDate, currentStudent?._id);
 
   const isToday = selectedDate === getToday();
+
+  // Keep the default view on the actual calendar day when midnight passes.
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const actualToday = getToday();
+      setSelectedDate((current) => (current === lastTodayRef.current ? actualToday : current));
+      lastTodayRef.current = actualToday;
+    }, 60 * 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Check if current user already posted a problem today
   const myProblemToday = isToday && currentStudent
@@ -30,9 +41,15 @@ const TodayProblems = ({ onProblemComplete }) => {
 
   const handleComplete = async (problemId) => {
     try {
-      const res = await completeProblem(problemId);
+      if (!currentStudent) throw new Error('Sign in to complete problems');
+      const res = await completeProblem(problemId, currentStudent._id);
       const pts = res.data.pointsEarned;
       const onTime = res.data.isOnTime;
+      if (!res.data.completedAt) {
+        addToast('Marked pending. Completion points removed.', 'success');
+        onProblemComplete?.();
+        return;
+      }
       addToast(
         `✓ Marked complete! +${pts} pts${onTime ? ' (on time 🎉)' : ' (late)'}`,
         'success'
@@ -49,6 +66,13 @@ const TodayProblems = ({ onProblemComplete }) => {
     onProblemComplete?.();
   };
 
+  const handleSaveNote = async (problemId, note) => {
+    if (!currentStudent) throw new Error('Sign in to save notes');
+    await saveProgress(problemId, currentStudent._id, note);
+    addToast('Note saved', 'success');
+    onProblemComplete?.();
+  };
+
   const handleDelete = async (problemId) => {
     try {
       await removeProblem(problemId);
@@ -58,7 +82,12 @@ const TodayProblems = ({ onProblemComplete }) => {
     }
   };
 
-  const completedCount = problems.filter((p) => p.isCompleted).length;
+  const totalQuestions = problems.length;
+  const completedCount = currentStudent
+    ? problems.filter((problem) => problem.completions?.some((progress) =>
+      progress.studentId?._id?.toString() === currentStudent._id?.toString() && progress.completedAt
+    )).length
+    : 0;
 
   return (
     <div>
@@ -98,13 +127,13 @@ const TodayProblems = ({ onProblemComplete }) => {
       {problems.length > 0 && (
         <div style={{ marginBottom: 16 }}>
           <div className="flex justify-between text-xs text-muted mb-3" style={{ marginBottom: 6 }}>
-            <span>{completedCount} / {problems.length} completed</span>
-            <span>{Math.round((completedCount / problems.length) * 100)}%</span>
+            <span>{completedCount} / {totalQuestions} completions</span>
+            <span>{totalQuestions ? Math.round((completedCount / totalQuestions) * 100) : 0}%</span>
           </div>
           <div className="progress-bar">
             <div
               className="progress-fill"
-              style={{ width: `${(completedCount / problems.length) * 100}%` }}
+              style={{ width: `${totalQuestions ? (completedCount / totalQuestions) * 100 : 0}%` }}
             />
           </div>
         </div>
@@ -138,6 +167,7 @@ const TodayProblems = ({ onProblemComplete }) => {
             key={problem._id}
             problem={problem}
             onComplete={handleComplete}
+            onSaveNote={handleSaveNote}
             onDelete={handleDelete}
             isToday={isToday}
           />

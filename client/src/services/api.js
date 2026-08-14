@@ -55,10 +55,11 @@ export const studentsApi = {
 
 // ── Problems ──────────────────────────────────────────────────────────────────
 export const problemsApi = {
-  getByDate: (date) => api.get(`/problems?date=${date}`),
+  getByDate: (date, studentId) => api.get(`/problems?date=${date}${studentId ? `&studentId=${studentId}` : ''}`),
   getById: (id) => api.get(`/problems/${id}`),
   create: (data) => api.post('/problems', data),
-  complete: (id) => api.patch(`/problems/${id}/complete`),
+  complete: (id, studentId) => api.patch(`/problems/${id}/complete`, { studentId }),
+  saveProgress: (id, studentId, note) => api.patch(`/problems/${id}/progress`, { studentId, note }),
   delete: (id) => api.delete(`/problems/${id}`),
 };
 

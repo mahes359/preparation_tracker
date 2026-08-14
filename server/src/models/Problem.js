@@ -16,6 +16,12 @@ const problemSchema = new mongoose.Schema(
       required: [true, 'Date is required'],
       index: true,
     },
+    challengeDate: {
+      type: String,
+      required: [true, 'Challenge date is required'],
+      match: [/^\d{4}-\d{2}-\d{2}$/, 'Challenge date must be YYYY-MM-DD'],
+      index: true,
+    },
     leetcodeUrl: {
       type: String,
       required: [true, 'LeetCode URL is required'],
@@ -36,25 +42,6 @@ const problemSchema = new mongoose.Schema(
       type: Date,
       required: true,
     },
-    completedAt: {
-      type: Date,
-      default: null,
-    },
-    isCompleted: {
-      type: Boolean,
-      default: false,
-      index: true,
-    },
-    // true if completed before deadline
-    isOnTime: {
-      type: Boolean,
-      default: null, // null = not yet completed
-    },
-    // Points stored on completion so re-reads are cheap
-    pointsEarned: {
-      type: Number,
-      default: 0,
-    },
     // Stub for future challenge types
     source: {
       type: String,
@@ -69,7 +56,6 @@ const problemSchema = new mongoose.Schema(
 
 // Compound indexes for the most common query patterns
 problemSchema.index({ date: 1, studentId: 1 });
-problemSchema.index({ studentId: 1, isCompleted: 1 });
-problemSchema.index({ date: 1, isCompleted: 1 });
+problemSchema.index({ challengeDate: 1, studentId: 1 }, { unique: true, sparse: true });
 
 module.exports = mongoose.model('Problem', problemSchema);

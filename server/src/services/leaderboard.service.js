@@ -1,99 +1,85 @@
-// src/services/leaderboard.service.js
-// Aggregation pipeline for real-time leaderboard rankings.
-
-const Problem = require('../models/Problem');
+const mongoose = require('mongoose');
+const Completion = require('../models/Completion');
 const Student = require('../models/Student');
+const Problem = require('../models/Problem');
 
-/**
- * Computes the all-time leaderboard (overall rankings).
- * Ties broken by: onTimeCount DESC → completedCount DESC → name ASC
- */
 const getLeaderboard = async () => {
-  // Step 1: Aggregate points and counts per student from completed problems
-  const aggregated = await Problem.aggregate([
-    { $match: { isCompleted: true } },
-    {
-      $group: {
-        _id: '$studentId',
-        totalPoints: { $sum: '$pointsEarned' },
-        completedCount: { $sum: 1 },
-        onTimeCount: { $sum: { $cond: ['$isOnTime', 1, 0] } },
-        lateCount: { $sum: { $cond: ['$isOnTime', 0, 1] } },
-      },
-    },
-    { $sort: { totalPoints: -1, onTimeCount: -1, completedCount: -1 } },
+  const aggregated = await Completion.aggregate([
+    { $match: { completedAt: { $ne: null } } },
+    { $group: {
+      _id: '$studentId', totalPoints: { $sum: '$pointsEarned' }, completedCount: { $sum: 1 },
+      onTimeCount: { $sum: { $cond: ['$isOnTime', 1, 0] } },
+      lateCount: { $sum: { $cond: ['$isOnTime', 0, 1] } },
+    } },
   ]);
-
-  // Step 2: Get all active students (so students with 0 points still appear)
   const allStudents = await Student.find({ isActive: true }).lean({ virtuals: true });
-
-  // Step 3: Merge — students with no completed problems get zero stats
-  const statsMap = new Map(aggregated.map((s) => [s._id.toString(), s]));
-
-  const rankings = allStudents
-    .map((student) => {
-      const stats = statsMap.get(student._id.toString()) || {
-        totalPoints: 0,
-        completedCount: 0,
-        onTimeCount: 0,
-        lateCount: 0,
-      };
-      return { student, ...stats };
-    })
-    .sort((a, b) => {
-      if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints;
-      if (b.onTimeCount !== a.onTimeCount) return b.onTimeCount - a.onTimeCount;
-      if (b.completedCount !== a.completedCount) return b.completedCount - a.completedCount;
-      return a.student.name.localeCompare(b.student.name);
-    })
+  const statsMap = new Map(aggregated.map((stat) => [stat._id.toString(), stat]));
+  return allStudents.map((student) => ({ student, ...(statsMap.get(student._id.toString()) || {
+    totalPoints: 0, completedCount: 0, onTimeCount: 0, lateCount: 0,
+  }) })).sort((a, b) => b.totalPoints - a.totalPoints || b.onTimeCount - a.onTimeCount ||
+    b.completedCount - a.completedCount || a.student.name.localeCompare(b.student.name))
     .map((entry, index) => ({ ...entry, rank: index + 1 }));
-
-  return rankings;
 };
 
-/**
- * Gets a single student's personal stats.
- */
 const getStudentStats = async (studentId) => {
-  const [stats] = await Problem.aggregate([
-    { $match: { studentId: new (require('mongoose').Types.ObjectId)(studentId) } },
-    {
-      $group: {
-        _id: '$studentId',
-        totalPoints: { $sum: '$pointsEarned' },
-        totalProblems: { $sum: 1 },
-        completedCount: { $sum: { $cond: ['$isCompleted', 1, 0] } },
-        onTimeCount: { $sum: { $cond: ['$isOnTime', 1, 0] } },
-        lateCount: {
-          $sum: {
-            $cond: [{ $and: ['$isCompleted', { $eq: ['$isOnTime', false] }] }, 1, 0],
-          },
-        },
-        pendingCount: { $sum: { $cond: ['$isCompleted', 0, 1] } },
-      },
-    },
+  const objectId = new mongoose.Types.ObjectId(studentId);
+  const [stats, questionsPosted, totalQuestions] = await Promise.all([
+    Completion.aggregate([
+    { $match: { studentId: objectId, completedAt: { $ne: null } } },
+    { $group: {
+      _id: '$studentId', totalPoints: { $sum: '$pointsEarned' },
+      completedCount: { $sum: 1 }, onTimeCount: { $sum: { $cond: ['$isOnTime', 1, 0] } },
+      lateCount: { $sum: { $cond: ['$isOnTime', 0, 1] } },
+    } },
+    ]),
+    Problem.countDocuments({ studentId: objectId }),
+    Problem.countDocuments(),
   ]);
-
-  return (
-    stats || {
-      totalPoints: 0,
-      totalProblems: 0,
-      completedCount: 0,
-      onTimeCount: 0,
-      lateCount: 0,
-      pendingCount: 0,
-    }
-  );
+  const completed = stats?.completedCount || 0;
+  return {
+    totalPoints: stats?.totalPoints || 0,
+    questionsPosted,
+    totalQuestions,
+    completedCount: completed,
+    pendingCount: Math.max(totalQuestions - completed, 0),
+    onTimeCount: stats?.onTimeCount || 0,
+    lateCount: stats?.lateCount || 0,
+  };
 };
 
-/**
- * Returns daily problem history for a student (for profile page).
- */
+const getGroupStats = async () => {
+  const [questionsPosted, activeStudents, completionStats] = await Promise.all([
+    Problem.countDocuments(),
+    Student.countDocuments({ isActive: true }),
+    Completion.aggregate([
+      { $match: { completedAt: { $ne: null } } },
+      { $group: {
+        _id: null,
+        totalPoints: { $sum: '$pointsEarned' },
+        totalCompleted: { $sum: 1 },
+        onTime: { $sum: { $cond: ['$isOnTime', 1, 0] } },
+        late: { $sum: { $cond: ['$isOnTime', 0, 1] } },
+      } },
+    ]),
+  ]);
+  return {
+    questionsPosted,
+    totalCompletions: completionStats[0]?.totalCompleted || 0,
+    totalRequiredCompletions: questionsPosted * activeStudents,
+    completionRate: questionsPosted * activeStudents
+      ? Math.round(((completionStats[0]?.totalCompleted || 0) / (questionsPosted * activeStudents)) * 100)
+      : 0,
+    onTimeCompletions: completionStats[0]?.onTime || 0,
+    lateCompletions: completionStats[0]?.late || 0,
+  };
+};
+
 const getStudentHistory = async (studentId, limit = 30) => {
-  return Problem.find({ studentId })
-    .sort({ date: -1 })
-    .limit(limit)
-    .lean();
+  const records = await Completion.find({ studentId, completedAt: { $ne: null } }).populate('problemId').sort({ completedAt: -1 }).limit(limit).lean();
+  return records.filter(({ problemId }) => problemId).map((record) => ({
+    ...record.problemId, date: record.problemId.challengeDate || record.problemId.date,
+    isCompleted: true, isOnTime: record.isOnTime, pointsEarned: record.pointsEarned,
+  }));
 };
 
-module.exports = { getLeaderboard, getStudentStats, getStudentHistory };
+module.exports = { getLeaderboard, getGroupStats, getStudentStats, getStudentHistory };

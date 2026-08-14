@@ -8,7 +8,8 @@ const ctrl = require('../controllers/config.controller');
 const updateConfigSchema = z.object({
   onTimePoints: z.number().int().min(1).max(100),
   latePoints: z.number().int().min(0).max(100),
-  deadlineHourUTC: z.number().int().min(0).max(23),
+  deadlineHour: z.number().int().min(0).max(23),
+  deadlineMinute: z.number().int().min(0).max(59).optional(),
   description: z.string().optional(),
 });
 

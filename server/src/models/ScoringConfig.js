@@ -22,13 +22,14 @@ const scoringConfigSchema = new mongoose.Schema(
       default: 5,
       min: [0, 'Late points cannot be negative'],
     },
-    // Hour (0-23) in UTC when daily deadline closes
-    deadlineHourUTC: {
+    // Local APP_TIMEZONE deadline clock time for the challenge date.
+    deadlineHour: {
       type: Number,
-      default: 18, // 11:30 PM IST
+      default: 23,
       min: 0,
       max: 23,
     },
+    deadlineMinute: { type: Number, default: 59, min: 0, max: 59 },
     isActive: {
       type: Boolean,
       default: true,
