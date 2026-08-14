@@ -9,11 +9,12 @@ const env = require('./src/config/env');
 
 const AVATAR_COLORS = ['#6c63ff', '#f64f59', '#11998e'];
 
-const STUDENTS = [
-  { name: 'Alice Johnson', email: 'alice@example.com', avatarColor: AVATAR_COLORS[0] },
-  { name: 'Bob Smith', email: 'bob@example.com', avatarColor: AVATAR_COLORS[1] },
-  { name: 'Charlie Davis', email: 'charlie@example.com', avatarColor: AVATAR_COLORS[2] },
-];
+// const STUDENTS = [
+//   { name: 'Alice Johnson', email: 'alice@example.com', avatarColor: AVATAR_COLORS[0] },
+//   { name: 'Bob Smith', email: 'bob@example.com', avatarColor: AVATAR_COLORS[1] },
+//   { name: 'Charlie Davis', email: 'charlie@example.com', avatarColor: AVATAR_COLORS[2] },
+// ];
+const STUDENTS = [];
 
 const seed = async () => {
   try {
