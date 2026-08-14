@@ -24,19 +24,27 @@ const studentSchema = new mongoose.Schema(
       type: String,
       unique: true,
       sparse: true,
-
-
     },
     avatarColor: {
       type: String,
       default: '#6c63ff',
     },
-    // Stub for future group/team support — null for MVP
+    role: {
+      type: String,
+      enum: ['ADMIN', 'GROUP_CREATOR', 'MEMBER'],
+      default: 'MEMBER',
+      index: true,
+    },
     groupId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Group',
       default: null,
     },
+    groupIds: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Group',
+      default: [],
+    }],
     isActive: {
       type: Boolean,
       default: true,

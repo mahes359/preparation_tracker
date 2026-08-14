@@ -10,6 +10,12 @@ const problemSchema = new mongoose.Schema(
       required: [true, 'Student ID is required'],
       index: true,
     },
+    groupId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Group',
+      default: null,
+      index: true,
+    },
     // Calendar date the problem belongs to (stored as UTC midnight)
     date: {
       type: Date,
@@ -56,6 +62,7 @@ const problemSchema = new mongoose.Schema(
 
 // Compound indexes for the most common query patterns
 problemSchema.index({ date: 1, studentId: 1 });
-problemSchema.index({ challengeDate: 1, studentId: 1 }, { unique: true, sparse: true });
+// One problem per student per group per day (sparse allows null groupId rows)
+problemSchema.index({ challengeDate: 1, studentId: 1, groupId: 1 }, { unique: true, sparse: true });
 
 module.exports = mongoose.model('Problem', problemSchema);

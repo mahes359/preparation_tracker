@@ -19,6 +19,15 @@ const ProblemCard = ({ problem, onComplete, onSaveNote, onDelete, isToday }) => 
   const statusProblem = { ...problem, isCompleted, isOnTime: myProgress?.isOnTime };
   const isMyPost = currentStudentId && poster?._id?.toString() === currentStudentId;
 
+  // Position label among on-time completions
+  const onTimeCompletions = (problem.completions || [])
+    .filter((c) => c.completedAt && c.isOnTime)
+    .sort((a, b) => new Date(a.completedAt) - new Date(b.completedAt));
+  const myPosition = isCompleted && myProgress?.isOnTime
+    ? onTimeCompletions.findIndex((c) => c.studentId?._id?.toString() === currentStudentId) + 1
+    : null;
+  const positionLabel = myPosition === 1 ? '🥇 1st' : myPosition === 2 ? '🥈 2nd' : myPosition === 3 ? '🥉 3rd' : null;
+
   const complete = async () => {
     if (completing) return;
     setCompleting(true);
@@ -39,6 +48,7 @@ const ProblemCard = ({ problem, onComplete, onSaveNote, onDelete, isToday }) => 
           <a href={problem.leetcodeUrl} target="_blank" rel="noopener noreferrer" className="font-bold truncate" style={{ color: 'var(--text-primary)', fontSize: '0.95rem' }}>{problem.title || 'LeetCode Problem'}</a>
           <StatusChip problem={statusProblem} />
           {isCompleted && <span className="badge badge-purple">+{myProgress.pointsEarned} pts</span>}
+          {positionLabel && <span className="badge badge-green" style={{ fontSize: '0.7rem' }}>{positionLabel}</span>}
         </div>
         <div className="text-xs text-muted">Posted by {poster?.name || 'Unknown'}</div>
         <div className="text-xs text-muted mt-2">My Progress: {isCompleted ? 'Completed' : 'Pending'}</div>
@@ -56,7 +66,7 @@ const ProblemCard = ({ problem, onComplete, onSaveNote, onDelete, isToday }) => 
         ) : (
           <div className={`custom-checkbox ${isCompleted ? 'checked' : ''}`} title={!isSignedIn ? 'Sign in to complete problems' : undefined}>{isCompleted && <span style={{ color: 'white' }}>✓</span>}</div>
         )}
-        {isToday && isMyPost && !problem.completions?.length && onDelete && <button className="btn btn-ghost" onClick={() => onDelete(problem._id)} title="Remove problem" style={{ padding: '2px 6px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>x</button>}
+        {isToday && isMyPost && !problem.completions?.some((c) => c.completedAt) && onDelete && <button className="btn btn-ghost" onClick={() => onDelete(problem._id)} title="Remove problem" style={{ padding: '2px 6px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>x</button>}
       </div>
     </div>
   );

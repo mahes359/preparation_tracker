@@ -1,8 +1,8 @@
 // src/jobs/dailyDeadline.job.js
-// Runs at midnight UTC every day to mark overdue pending problems.
-// This ensures students with no completion by deadline don't stay "pending" forever.
+// Runs at midnight UTC every day to log overdue pending completions.
 
 const cron = require('node-cron');
+const Completion = require('../models/Completion');
 const Problem = require('../models/Problem');
 
 const runDeadlineJob = async () => {
@@ -10,23 +10,23 @@ const runDeadlineJob = async () => {
   console.log(`[DeadlineJob] Running at ${now.toISOString()}`);
 
   try {
-    // Find all pending problems whose deadline has passed
-    const result = await Problem.updateMany(
-      {
-        isCompleted: false,
-        deadline: { $lt: now },
-      },
-      {
-        // Leave isCompleted: false so they show as "missed" (0 points)
-        // We only need to ensure pointsEarned stays 0 (it's already the default)
-      }
-    );
-
-    if (result.modifiedCount > 0) {
-      console.log(`[DeadlineJob] Processed ${result.modifiedCount} overdue problems`);
-    } else {
+    // Find problems whose deadline has passed
+    const overdueProblems = await Problem.find({ deadline: { $lt: now } }).select('_id').lean();
+    if (overdueProblems.length === 0) {
       console.log('[DeadlineJob] No overdue problems found');
+      return;
     }
+
+    const overdueIds = overdueProblems.map((p) => p._id);
+
+    // Count pending completions for overdue problems (students who never completed)
+    const pendingCount = await Completion.countDocuments({
+      problemId: { $in: overdueIds },
+      status: 'pending',
+      completedAt: null,
+    });
+
+    console.log(`[DeadlineJob] ${overdueProblems.length} overdue problems, ${pendingCount} pending completions (0 pts)`);
   } catch (err) {
     console.error('[DeadlineJob] Error:', err.message);
   }

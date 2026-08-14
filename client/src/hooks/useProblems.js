@@ -1,11 +1,8 @@
-// src/hooks/useProblems.js
-// Fetches and manages problems for a specific date.
-
 import { useState, useEffect, useCallback } from 'react';
 import { problemsApi } from '../services/api';
 import { toApiDate } from '../utils/dateHelpers';
 
-const useProblems = (date, studentId) => {
+const useProblems = (date, studentId, groupId = null) => {
   const [problems, setProblems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -16,17 +13,23 @@ const useProblems = (date, studentId) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await problemsApi.getByDate(dateStr, studentId);
+      const res = await problemsApi.getByDate(dateStr, studentId, groupId);
       setProblems(res.data || []);
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, [dateStr, studentId]);
+  }, [dateStr, studentId, groupId]);
 
   useEffect(() => {
     fetchProblems();
+  }, [fetchProblems]);
+
+  // Poll every 45s for other users' changes
+  useEffect(() => {
+    const interval = setInterval(fetchProblems, 45000);
+    return () => clearInterval(interval);
   }, [fetchProblems]);
 
   const completeProblem = useCallback(async (problemId, studentId) => {
@@ -34,7 +37,7 @@ const useProblems = (date, studentId) => {
     setProblems((prev) => prev.map((problem) => {
       if (problem._id !== problemId) return problem;
       const records = [...(problem.completions || [])];
-      const index = records.findIndex((progress) => progress.studentId?._id?.toString() === studentId.toString());
+      const index = records.findIndex((c) => c.studentId?._id?.toString() === studentId.toString());
       if (index >= 0) records[index] = res.data;
       else records.push(res.data);
       return { ...problem, completions: records };
@@ -47,7 +50,7 @@ const useProblems = (date, studentId) => {
     setProblems((prev) => prev.map((problem) => {
       if (problem._id !== problemId) return problem;
       const records = [...(problem.completions || [])];
-      const index = records.findIndex((progress) => progress.studentId?._id?.toString() === studentId.toString());
+      const index = records.findIndex((c) => c.studentId?._id?.toString() === studentId.toString());
       if (index >= 0) records[index] = res.data;
       else records.push(res.data);
       return { ...problem, completions: records };

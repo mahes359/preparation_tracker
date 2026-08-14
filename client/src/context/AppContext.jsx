@@ -1,18 +1,19 @@
-// src/context/AppContext.jsx
-// Global state: students list, scoring config, current student (me), toast notifications.
-
-import { createContext, useContext, useReducer, useEffect, useCallback } from 'react';
+import { createContext, useContext, useReducer, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@clerk/clerk-react';
-import { studentsApi, configApi, authApi, setTokenGetter } from '../services/api';
+import { studentsApi, configApi, authApi, groupsApi, setTokenGetter } from '../services/api';
 
 const AppContext = createContext(null);
 
 const initialState = {
   students: [],
   scoringConfig: null,
-  currentStudent: null,  // the logged-in user's Student record
+  currentStudent: null,
+  activeGroupId: null,
+  groups: [],
+  memberships: [],
+  notificationCount: 0,
   toasts: [],
-  loading: { students: false, config: false, sync: false },
+  loading: { students: false, config: false, sync: false, groups: false },
 };
 
 const reducer = (state, action) => {
@@ -23,6 +24,14 @@ const reducer = (state, action) => {
       return { ...state, scoringConfig: action.payload };
     case 'SET_CURRENT_STUDENT':
       return { ...state, currentStudent: action.payload };
+    case 'SET_GROUPS':
+      return { ...state, groups: action.payload };
+    case 'SET_MEMBERSHIPS':
+      return { ...state, memberships: action.payload };
+    case 'SET_ACTIVE_GROUP':
+      return { ...state, activeGroupId: action.payload };
+    case 'SET_NOTIFICATION_COUNT':
+      return { ...state, notificationCount: action.payload };
     case 'SET_LOADING':
       return { ...state, loading: { ...state.loading, ...action.payload } };
     case 'ADD_TOAST':
@@ -37,8 +46,10 @@ const reducer = (state, action) => {
 export const AppProvider = ({ children }) => {
   const [state, dispatch] = useReducer(reducer, initialState);
   const { isLoaded, isSignedIn, getToken } = useAuth();
+  const notifIntervalRef = useRef(null);
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
-  // Register token getter so Axios interceptor can attach Clerk JWT
   useEffect(() => {
     setTokenGetter(() => getToken());
   }, [getToken]);
@@ -49,10 +60,10 @@ export const AppProvider = ({ children }) => {
     setTimeout(() => dispatch({ type: 'REMOVE_TOAST', payload: id }), 3500);
   }, []);
 
-  const fetchStudents = useCallback(async () => {
+  const fetchStudents = useCallback(async (groupId = null) => {
     dispatch({ type: 'SET_LOADING', payload: { students: true } });
     try {
-      const res = await studentsApi.getAll();
+      const res = await studentsApi.getAll(groupId);
       dispatch({ type: 'SET_STUDENTS', payload: res.data });
     } catch {
       addToast('Failed to load students', 'error');
@@ -66,11 +77,39 @@ export const AppProvider = ({ children }) => {
       const res = await configApi.getScoringConfig();
       dispatch({ type: 'SET_CONFIG', payload: res.data });
     } catch {
-      // silent — use defaults
+      // silent
     }
   }, []);
 
-  // When Clerk reports signed-in, sync user to get/create Student record
+  const fetchUserGroups = useCallback(async (currentActiveGroupId = null) => {
+    dispatch({ type: 'SET_LOADING', payload: { groups: true } });
+    try {
+      const res = await groupsApi.getUserMemberships();
+      const memberships = res.data?.memberships || [];
+      const groups = res.data?.groups || [];
+      dispatch({ type: 'SET_MEMBERSHIPS', payload: memberships });
+      dispatch({ type: 'SET_GROUPS', payload: groups });
+      // Clear activeGroupId if it no longer matches any active membership
+      const activeIds = memberships.filter((m) => m.status === 'ACTIVE').map((m) => m.groupId?.toString());
+      if (currentActiveGroupId && !activeIds.includes(currentActiveGroupId.toString())) {
+        dispatch({ type: 'SET_ACTIVE_GROUP', payload: null });
+      }
+    } catch {
+      // silent
+    } finally {
+      dispatch({ type: 'SET_LOADING', payload: { groups: false } });
+    }
+  }, []);
+
+  const fetchNotificationCount = useCallback(async () => {
+    try {
+      const res = await groupsApi.getNotificationCount();
+      dispatch({ type: 'SET_NOTIFICATION_COUNT', payload: res.data?.count || 0 });
+    } catch {
+      // silent
+    }
+  }, []);
+
   const syncCurrentUser = useCallback(async () => {
     dispatch({ type: 'SET_LOADING', payload: { sync: true } });
     try {
@@ -79,31 +118,51 @@ export const AppProvider = ({ children }) => {
       if (res.data.isNew) {
         addToast(`Welcome to Prep Tracker, ${res.data.student.name}! 🎉`, 'success');
       }
-      // Refresh student list to include the new student
-      await fetchStudents();
-    } catch (err) {
+      await fetchStudents(); // initial load without group scope; StudentsPage re-fetches with scope
+      await fetchUserGroups(stateRef.current.activeGroupId);
+      await fetchNotificationCount();
+    } catch {
       addToast('Failed to sync your profile', 'error');
     } finally {
       dispatch({ type: 'SET_LOADING', payload: { sync: false } });
     }
-  }, [addToast, fetchStudents]);
+  }, [addToast, fetchStudents, fetchUserGroups, fetchNotificationCount]);
 
   useEffect(() => {
     if (!isLoaded) return;
-
     if (isSignedIn) {
       syncCurrentUser();
       fetchConfig();
     } else {
-      // Not signed in — still fetch students for read-only view
-      fetchStudents();
       fetchConfig();
+      dispatch({ type: 'SET_STUDENTS', payload: [] });
       dispatch({ type: 'SET_CURRENT_STUDENT', payload: null });
+      dispatch({ type: 'SET_MEMBERSHIPS', payload: [] });
+      dispatch({ type: 'SET_GROUPS', payload: [] });
+      dispatch({ type: 'SET_ACTIVE_GROUP', payload: null });
+      dispatch({ type: 'SET_NOTIFICATION_COUNT', payload: 0 });
     }
-  }, [isLoaded, isSignedIn, syncCurrentUser, fetchStudents, fetchConfig]);
+  }, [isLoaded, isSignedIn, syncCurrentUser, fetchConfig]);
+
+  // Poll notification count every 30s when signed in
+  useEffect(() => {
+    if (isSignedIn) {
+      if (notifIntervalRef.current) clearInterval(notifIntervalRef.current);
+      notifIntervalRef.current = setInterval(fetchNotificationCount, 30000);
+    } else {
+      if (notifIntervalRef.current) clearInterval(notifIntervalRef.current);
+    }
+    return () => {
+      if (notifIntervalRef.current) clearInterval(notifIntervalRef.current);
+    };
+  }, [isSignedIn, fetchNotificationCount]);
+
+  const setActiveGroup = useCallback((groupId) => {
+    dispatch({ type: 'SET_ACTIVE_GROUP', payload: groupId });
+  }, []);
 
   return (
-    <AppContext.Provider value={{ state, dispatch, addToast, fetchStudents }}>
+    <AppContext.Provider value={{ state, dispatch, addToast, fetchStudents, fetchUserGroups, fetchNotificationCount, setActiveGroup }}>
       {children}
     </AppContext.Provider>
   );

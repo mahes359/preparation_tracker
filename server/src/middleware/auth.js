@@ -42,7 +42,11 @@ const clerk = isClerkConfigured
  * In open-access mode (no Clerk keys), skips the check.
  */
 const requireClerkAuth = isClerkConfigured
-  ? _requireAuth({ signInUrl: '/sign-in' })
+  ? (req, res, next) => {
+      const { userId } = _getAuth(req);
+      if (!userId) return res.status(401).json({ success: false, message: 'Authentication required' });
+      return next();
+    }
   : (req, res, next) => next();
 
 /**

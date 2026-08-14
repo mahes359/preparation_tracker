@@ -45,17 +45,43 @@ export const authApi = {
 
 // ── Students ──────────────────────────────────────────────────────────────────
 export const studentsApi = {
-  getAll: () => api.get('/students'),
+  getAll: (groupId) => api.get(`/students${groupId ? `?groupId=${groupId}` : ''}`),
   getById: (id) => api.get(`/students/${id}`),
   create: (data) => api.post('/students', data),
   update: (id, data) => api.put(`/students/${id}`, data),
   delete: (id) => api.delete(`/students/${id}`),
-  getStats: (id) => api.get(`/students/${id}/stats`),
+  getStats: (id, groupId) => api.get(`/students/${id}/stats${groupId ? `?groupId=${groupId}` : ''}`),
+};
+
+export const groupsApi = {
+  getAll: () => api.get('/groups'),
+  getById: (id) => api.get(`/groups/${id}`),
+  getUserMemberships: () => api.get('/groups/user/memberships'),
+  getNotificationCount: () => api.get('/groups/user/notifications/count'),
+  createRequest: (data) => api.post('/groups/requests', data),
+  join: (joinCode) => api.post('/groups/join', { joinCode }),
+  getJoinRequests: (id) => api.get(`/groups/${id}/requests`),
+  approveRequest: (id, requestId, action = 'APPROVE') => api.put(`/groups/${id}/requests/${requestId}/${action.toLowerCase()}`),
+  getDashboard: (id) => api.get(`/groups/${id}/dashboard`),
+  leaveGroup: (id) => api.post(`/groups/${id}/leave`),
+  removeMember: (groupId, userId) => api.delete(`/groups/${groupId}/members/${userId}`),
+};
+
+export const adminApi = {
+  getGroupRequests: () => api.get('/admin/group-requests'),
+  approveGroupRequest: (id) => api.put(`/groups/requests/${id}/approve`),
+  rejectGroupRequest: (id) => api.put(`/groups/requests/${id}/reject`),
+  getDashboard: () => api.get('/admin/dashboard'),
 };
 
 // ── Problems ──────────────────────────────────────────────────────────────────
 export const problemsApi = {
-  getByDate: (date, studentId) => api.get(`/problems?date=${date}${studentId ? `&studentId=${studentId}` : ''}`),
+  getByDate: (date, studentId, groupId) => {
+    let url = `/problems?date=${date}`;
+    if (studentId) url += `&studentId=${studentId}`;
+    if (groupId) url += `&groupId=${groupId}`;
+    return api.get(url);
+  },
   getById: (id) => api.get(`/problems/${id}`),
   create: (data) => api.post('/problems', data),
   complete: (id, studentId) => api.patch(`/problems/${id}/complete`, { studentId }),
@@ -65,7 +91,7 @@ export const problemsApi = {
 
 // ── Leaderboard ───────────────────────────────────────────────────────────────
 export const leaderboardApi = {
-  get: () => api.get('/leaderboard'),
+  get: (groupId) => api.get(`/leaderboard${groupId ? `?groupId=${groupId}` : ''}`),
 };
 
 // ── Config ────────────────────────────────────────────────────────────────────

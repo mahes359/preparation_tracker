@@ -3,6 +3,7 @@
 const router = require('express').Router();
 const { z } = require('zod');
 const validate = require('../middleware/validate');
+const { requireActiveGroupMembership } = require('../middleware/rbac');
 const ctrl = require('../controllers/problems.controller');
 
 const createProblemSchema = z.object({
@@ -13,14 +14,15 @@ const createProblemSchema = z.object({
     .refine((u) => u.includes('leetcode.com/problems/'), {
       message: 'Must be a valid LeetCode problem URL',
     }),
-  date: z.string().optional(), // YYYY-MM-DD, defaults to today on server
+  date: z.string().optional(),
+  groupId: z.string().length(24).optional().nullable(),
 });
 
 router.get('/', ctrl.getProblems);
-router.post('/', validate(createProblemSchema), ctrl.createProblem);
+router.post('/', requireActiveGroupMembership, validate(createProblemSchema), ctrl.createProblem);
 router.get('/:id', ctrl.getProblem);
-router.patch('/:id/complete', validate(z.object({ studentId: z.string().length(24, 'Invalid student ID') })), ctrl.completeProblem);
-router.patch('/:id/progress', validate(z.object({ studentId: z.string().length(24, 'Invalid student ID'), note: z.string().max(2000) })), ctrl.saveProgressNote);
+router.patch('/:id/complete', requireActiveGroupMembership, validate(z.object({ studentId: z.string().length(24, 'Invalid student ID') })), ctrl.completeProblem);
+router.patch('/:id/progress', requireActiveGroupMembership, validate(z.object({ studentId: z.string().length(24, 'Invalid student ID'), note: z.string().max(2000) })), ctrl.saveProgressNote);
 router.delete('/:id', ctrl.deleteProblem);
 
 module.exports = router;

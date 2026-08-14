@@ -8,15 +8,15 @@ import { useState } from 'react';
 import { useAuth, SignInButton } from '@clerk/clerk-react';
 import { useApp } from '../../context/AppContext';
 
-const AddProblemModal = ({ onClose, onAdd, selectedDate }) => {
+const AddProblemModal = ({ onClose, onAdd, selectedDate, groupId }) => {
   const { state } = useApp();
   const { isSignedIn } = useAuth();
   const { currentStudent } = state;
 
-  // Pre-select the logged-in student; admins see the full list
   const [form, setForm] = useState({
     studentId: currentStudent?._id || '',
     leetcodeUrl: '',
+    groupId: groupId || '',
   });
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);

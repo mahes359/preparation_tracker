@@ -3,10 +3,30 @@
 const Student = require('../models/Student');
 const asyncHandler = require('../middleware/asyncHandler');
 const { getStudentStats, getStudentHistory, getLeaderboard } = require('../services/leaderboard.service');
+const { getCurrentStudent } = require('../middleware/rbac');
 
 const getStudents = asyncHandler(async (req, res) => {
-  const students = await Student.find({ isActive: true }).lean({ virtuals: true });
-  res.json({ success: true, data: students });
+  const requester = await getCurrentStudent(req);
+
+  // Admin sees everyone
+  if (requester && requester.role === 'ADMIN') {
+    const students = await Student.find({ isActive: true }).lean({ virtuals: true });
+    return res.json({ success: true, data: students });
+  }
+
+  // Authenticated member sees only group-mates in the requested group
+  if (requester && requester.groupIds && requester.groupIds.length > 0) {
+    const groupId = req.query.groupId || null;
+    const filterGroupIds = groupId ? [groupId] : requester.groupIds;
+    const students = await Student.find({
+      isActive: true,
+      groupIds: { $in: filterGroupIds },
+    }).lean({ virtuals: true });
+    return res.json({ success: true, data: students });
+  }
+
+  // No group membership — return empty list
+  res.json({ success: true, data: [] });
 });
 
 const getStudent = asyncHandler(async (req, res) => {
@@ -42,15 +62,15 @@ const deleteStudent = asyncHandler(async (req, res) => {
 
 const getStudentStatsHandler = asyncHandler(async (req, res) => {
   const { id } = req.params;
+  const groupId = req.query.groupId || null;
 
-  // Verify student exists
   const student = await Student.findById(id).lean({ virtuals: true });
   if (!student) return res.status(404).json({ success: false, message: 'Student not found' });
 
   const [stats, history, leaderboard] = await Promise.all([
-    getStudentStats(id),
-    getStudentHistory(id, 30),
-    getLeaderboard(),
+    getStudentStats(id, groupId || student.groupId || null),
+    getStudentHistory(id, 30, groupId || student.groupId || null),
+    getLeaderboard(groupId || student.groupId || null),
   ]);
 
   const rankEntry = leaderboard.find((r) => r.student._id.toString() === id);

@@ -7,13 +7,6 @@ const Student = require('./src/models/Student');
 const ScoringConfig = require('./src/models/ScoringConfig');
 const env = require('./src/config/env');
 
-const AVATAR_COLORS = ['#6c63ff', '#f64f59', '#11998e'];
-
-// const STUDENTS = [
-//   { name: 'Alice Johnson', email: 'alice@example.com', avatarColor: AVATAR_COLORS[0] },
-//   { name: 'Bob Smith', email: 'bob@example.com', avatarColor: AVATAR_COLORS[1] },
-//   { name: 'Charlie Davis', email: 'charlie@example.com', avatarColor: AVATAR_COLORS[2] },
-// ];
 const STUDENTS = [];
 
 const seed = async () => {
@@ -21,25 +14,27 @@ const seed = async () => {
     await mongoose.connect(env.MONGO_URI);
     console.log('✅  Connected to MongoDB');
     await Student.syncIndexes();
-    // Clear existing data
+
     await Student.deleteMany({});
     await ScoringConfig.deleteMany({});
     console.log('🗑️   Cleared existing data');
 
-    // Create students
     const students = await Student.insertMany(STUDENTS);
-    console.log(`👥  Created ${students.length} students:`);
-    students.forEach((s) => console.log(`     - ${s.name} (${s.email})`));
+    console.log(`👥  Created ${students.length} students`);
 
-    // Create default scoring config
     await ScoringConfig.create({
-      onTimePoints: 10,
-      latePoints: 5,
-      deadlineHourUTC: 18, // 11:30 PM IST
-      description: 'Default config — 10 pts on-time, 5 pts late',
+      firstPoints: 15,
+      secondPoints: 12,
+      standardPoints: 10,
+      lateSameDayPoints: 6,
+      lateOneDayPoints: 3,
+      lateTwoPlusDayPoints: 1,
+      deadlineHour: 23,
+      deadlineMinute: 59,
+      description: 'Position-based: 1st=15, 2nd=12, 3rd+=10 | Late: same-day=6, 1-day=3, 2+days=1',
       isActive: true,
     });
-    console.log('⚙️   Created default scoring configuration');
+    console.log('⚙️   Created position-based scoring configuration');
     console.log('\n✅  Seed complete! Run "npm run dev" to start the server.');
   } catch (err) {
     console.error('❌  Seed failed:', err.message);

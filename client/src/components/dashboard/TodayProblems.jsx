@@ -11,7 +11,7 @@ import Spinner from '../common/Spinner';
 import useProblems from '../../hooks/useProblems';
 import { getToday } from '../../utils/dateHelpers';
 
-const TodayProblems = ({ onProblemComplete }) => {
+const TodayProblems = ({ onProblemComplete, groupId = null }) => {
   const [selectedDate, setSelectedDate] = useState(getToday());
   const lastTodayRef = useRef(getToday());
   const [showModal, setShowModal] = useState(false);
@@ -19,8 +19,11 @@ const TodayProblems = ({ onProblemComplete }) => {
   const { isSignedIn } = useAuth();
   const { currentStudent } = state;
 
+  // A user can interact if they are signed in and have a groupId context
+  const canInteract = isSignedIn && !!groupId;
+
   const { problems, loading, error, completeProblem, saveProgress, addProblem, removeProblem } =
-    useProblems(selectedDate, currentStudent?._id);
+    useProblems(selectedDate, currentStudent?._id, groupId);
 
   const isToday = selectedDate === getToday();
 
@@ -42,6 +45,7 @@ const TodayProblems = ({ onProblemComplete }) => {
   const handleComplete = async (problemId) => {
     try {
       if (!currentStudent) throw new Error('Sign in to complete problems');
+      if (!canInteract) throw new Error('You must belong to an active group to mark problems complete');
       const res = await completeProblem(problemId, currentStudent._id);
       const pts = res.data.pointsEarned;
       const onTime = res.data.isOnTime;
@@ -50,10 +54,7 @@ const TodayProblems = ({ onProblemComplete }) => {
         onProblemComplete?.();
         return;
       }
-      addToast(
-        `✓ Marked complete! +${pts} pts${onTime ? ' (on time 🎉)' : ' (late)'}`,
-        'success'
-      );
+      addToast(`✓ Marked complete! +${pts} pts${onTime ? ' (on time 🎉)' : ' (late)'}`, 'success');
       onProblemComplete?.();
     } catch (err) {
       addToast(err.message, 'error');
@@ -61,6 +62,10 @@ const TodayProblems = ({ onProblemComplete }) => {
   };
 
   const handleAdd = async (data) => {
+    if (!canInteract) {
+      addToast('You must belong to an active group to add problems', 'error');
+      return;
+    }
     await addProblem(data);
     addToast('Problem added successfully!', 'success');
     onProblemComplete?.();
@@ -114,7 +119,14 @@ const TodayProblems = ({ onProblemComplete }) => {
                 id="add-problem-btn"
                 className="btn btn-primary btn-sm"
                 onClick={() => setShowModal(true)}
-                title={!isSignedIn ? 'Sign in to add a problem' : 'Add your daily problem'}
+                disabled={!canInteract}
+                title={
+                  !isSignedIn
+                    ? 'Sign in to add a problem'
+                    : !groupId
+                    ? 'Open a group to add problems'
+                    : 'Add your daily problem'
+                }
               >
                 + Add Problem
               </button>
@@ -179,6 +191,7 @@ const TodayProblems = ({ onProblemComplete }) => {
           onClose={() => setShowModal(false)}
           onAdd={handleAdd}
           selectedDate={selectedDate}
+          groupId={groupId}
         />
       )}
     </div>

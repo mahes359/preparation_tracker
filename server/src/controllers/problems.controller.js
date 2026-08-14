@@ -31,9 +31,9 @@ const viewerStudentForRead = async (req) => {
 };
 
 const getProblems = asyncHandler(async (req, res) => {
-  // ?date=YYYY-MM-DD  (defaults to today)
   const date = req.query.date || undefined;
-  const problems = await problemService.getProblemsForDate(date, await viewerStudentForRead(req));
+  const groupId = req.query.groupId || null;
+  const problems = await problemService.getProblemsForDate(date, await viewerStudentForRead(req), groupId);
   res.json({ success: true, data: problems });
 });
 
@@ -43,22 +43,22 @@ const getProblem = asyncHandler(async (req, res) => {
 });
 
 const createProblem = asyncHandler(async (req, res) => {
-  const { studentId, leetcodeUrl, date } = req.body;
+  const { studentId, leetcodeUrl, date, groupId } = req.body;
   const problem = await problemService.createProblem({
-    studentId: await studentForMutation(req, studentId), leetcodeUrl, date,
+    studentId: await studentForMutation(req, studentId), leetcodeUrl, date, groupId: groupId || null,
   });
   res.status(201).json({ success: true, data: problem });
 });
 
 const completeProblem = asyncHandler(async (req, res) => {
-  const problem = await problemService.completeProblem(
+  const completion = await problemService.completeProblem(
     req.params.id, await studentForMutation(req, req.body.studentId)
   );
   res.json({
     success: true,
-    data: problem,
-    pointsEarned: problem.pointsEarned,
-    isOnTime: problem.isOnTime,
+    data: completion,
+    pointsEarned: completion.pointsEarned,
+    isOnTime: completion.isOnTime,
   });
 });
 

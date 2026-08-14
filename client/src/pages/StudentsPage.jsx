@@ -1,28 +1,41 @@
-// src/pages/StudentsPage.jsx
-// Lists all students with links to their profiles.
-
+import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
+import { useActiveGroup } from '../hooks/useActiveGroup';
 import Spinner from '../components/common/Spinner';
 import { getRankEmoji } from '../utils/pointsHelpers';
 import useLeaderboard from '../hooks/useLeaderboard';
 
 const StudentsPage = () => {
-  const { state } = useApp();
-  const { rankings, loading: rankLoading } = useLeaderboard();
+  const { state, fetchStudents } = useApp();
+  const { activeGroupId, isAdmin } = useActiveGroup();
+  const { rankings, loading: rankLoading } = useLeaderboard(activeGroupId);
+
+  // Re-fetch students scoped to the active group whenever it changes
+  useEffect(() => {
+    fetchStudents(isAdmin ? null : activeGroupId);
+  }, [activeGroupId, isAdmin, fetchStudents]);
 
   const rankMap = new Map(rankings.map((r) => [r.student._id.toString(), r]));
 
   if (state.loading.students) return <Spinner text="Loading students..." />;
 
+  // Admin sees all students; members see only their group-mates (scoped by backend)
+  const students = state.students;
+
   return (
     <div style={{ maxWidth: 720, margin: '0 auto' }}>
       <div className="flex items-center justify-between" style={{ marginBottom: 20 }}>
         <h1>Students</h1>
+        {!isAdmin && activeGroupId && (
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+            Showing group members only
+          </span>
+        )}
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {state.students.map((student) => {
+        {students.map((student) => {
           const rankEntry = rankMap.get(student._id.toString());
           return (
             <Link
@@ -67,10 +80,14 @@ const StudentsPage = () => {
         })}
       </div>
 
-      {state.students.length === 0 && (
+      {students.length === 0 && (
         <div className="empty-state">
           <div className="empty-icon">👥</div>
-          <p>No students found. Run the seed script to add initial students.</p>
+          <p>
+            {isAdmin
+              ? 'No students found.'
+              : 'No group members found. Join a group to see your group-mates here.'}
+          </p>
         </div>
       )}
     </div>

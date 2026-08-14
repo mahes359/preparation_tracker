@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const completionSchema = new mongoose.Schema({
   studentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Student', required: true, index: true },
   problemId: { type: mongoose.Schema.Types.ObjectId, ref: 'Problem', required: true, index: true },
+  groupId: { type: mongoose.Schema.Types.ObjectId, ref: 'Group', default: null, index: true },
   challengeDate: { type: String, required: true, match: [/^\d{4}-\d{2}-\d{2}$/, 'Challenge date must be YYYY-MM-DD'], index: true },
   status: { type: String, enum: ['pending', 'completed'], default: 'pending', index: true },
   note: { type: String, trim: true, maxlength: 2000, default: '' },

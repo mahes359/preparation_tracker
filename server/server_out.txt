@@ -1,0 +1,4 @@
+🔐  Clerk auth: enabled
+✅  MongoDB connected: ac-oqjijfz-shard-00-00.1mhh6al.mongodb.net
+⏰  Daily deadline job scheduled (runs at 00:01 UTC)
+🚀  Server running on http://localhost:5000 [development]

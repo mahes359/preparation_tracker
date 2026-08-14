@@ -1,9 +1,7 @@
-// src/hooks/useLeaderboard.js
-
 import { useState, useEffect, useCallback } from 'react';
 import { leaderboardApi } from '../services/api';
 
-const useLeaderboard = () => {
+const useLeaderboard = (groupId = null) => {
   const [rankings, setRankings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -14,7 +12,7 @@ const useLeaderboard = () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await leaderboardApi.get();
+      const res = await leaderboardApi.get(groupId);
       setRankings(res.data || []);
       setAsOf(res.asOf);
       setGroupStats(res.groupStats || null);
@@ -23,7 +21,7 @@ const useLeaderboard = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [groupId]);
 
   useEffect(() => {
     fetchLeaderboard();
