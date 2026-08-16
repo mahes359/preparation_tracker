@@ -2,6 +2,12 @@ import { useState, useEffect, useCallback } from 'react';
 import { problemsApi } from '../services/api';
 import { toApiDate } from '../utils/dateHelpers';
 
+const notifyRefresh = (groupId) => {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('tracker:refresh', { detail: { groupId } }));
+  }
+};
+
 const useProblems = (date, studentId, groupId = null) => {
   const [problems, setProblems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -42,8 +48,9 @@ const useProblems = (date, studentId, groupId = null) => {
       else records.push(res.data);
       return { ...problem, completions: records };
     }));
+    notifyRefresh(groupId);
     return res;
-  }, []);
+  }, [groupId]);
 
   const saveProgress = useCallback(async (problemId, studentId, note) => {
     const res = await problemsApi.saveProgress(problemId, studentId, note);
@@ -55,19 +62,22 @@ const useProblems = (date, studentId, groupId = null) => {
       else records.push(res.data);
       return { ...problem, completions: records };
     }));
+    notifyRefresh(groupId);
     return res;
-  }, []);
+  }, [groupId]);
 
   const addProblem = useCallback(async (data) => {
     const res = await problemsApi.create(data);
     setProblems((prev) => [...prev, res.data]);
+    notifyRefresh(groupId);
     return res;
-  }, []);
+  }, [groupId]);
 
   const removeProblem = useCallback(async (problemId) => {
     await problemsApi.delete(problemId);
     setProblems((prev) => prev.filter((p) => p._id !== problemId));
-  }, []);
+    notifyRefresh(groupId);
+  }, [groupId]);
 
   return { problems, loading, error, refetch: fetchProblems, completeProblem, saveProgress, addProblem, removeProblem };
 };

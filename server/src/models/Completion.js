@@ -13,6 +13,8 @@ const completionSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 completionSchema.index({ studentId: 1, problemId: 1 }, { unique: true });
+completionSchema.index({ studentId: 1, groupId: 1, challengeDate: 1 });
+completionSchema.index({ groupId: 1, challengeDate: 1 });
 completionSchema.index({ studentId: 1, challengeDate: 1 });
 
 module.exports = mongoose.model('Completion', completionSchema);

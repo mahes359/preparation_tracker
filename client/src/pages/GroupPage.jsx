@@ -8,7 +8,9 @@ import Leaderboard from '../components/leaderboard/Leaderboard';
 import OverallStats from '../components/dashboard/OverallStats';
 import Spinner from '../components/common/Spinner';
 import useLeaderboard from '../hooks/useLeaderboard';
+import useProblems from '../hooks/useProblems';
 import { getRankEmoji } from '../utils/pointsHelpers';
+import { getToday } from '../utils/dateHelpers';
 
 const TABS = ['Dashboard', 'Students', 'Members'];
 
@@ -30,6 +32,7 @@ const GroupPage = () => {
   const isCreator = membership?.role === 'CREATOR' || isAdmin;
 
   const { rankings, groupStats, loading: lbLoading, error: lbError, refetch: refetchLeaderboard } = useLeaderboard(groupId);
+  const { problems: todayProblems, loading: todayProblemsLoading } = useProblems(getToday(), currentStudent?._id, groupId);
 
   const loadGroup = useCallback(async () => {
     setLoading(true);
@@ -136,8 +139,37 @@ const GroupPage = () => {
             <span>📅 2+ days late = <strong style={{ color: 'var(--red)' }}>1</strong></span>
           </div>
           <div className="dashboard-grid">
-            <div className="card">
-              <TodayProblems onProblemComplete={refetchLeaderboard} groupId={groupId} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              <div className="card">
+                <TodayProblems onProblemComplete={refetchLeaderboard} groupId={groupId} />
+              </div>
+              <div className="card">
+                <div className="card-header">
+                  <span className="card-title">Today</span>
+                </div>
+                {!currentStudent ? (
+                  <div className="empty-state" style={{ padding: '18px' }}><p>Sign in to see your daily progress.</p></div>
+                ) : todayProblemsLoading ? (
+                  <Spinner size="sm" />
+                ) : (
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                      <span>Questions: {todayProblems.length}</span>
+                      <span>{todayProblems.length ? Math.round((todayProblems.filter((problem) => problem.completions?.some((progress) => progress.studentId?._id?.toString() === currentStudent._id?.toString() && progress.completedAt)).length / todayProblems.length) * 100) : 0}%</span>
+                    </div>
+                    <div className="progress-bar" style={{ marginBottom: 12 }}>
+                      <div
+                        className="progress-fill"
+                        style={{ width: `${todayProblems.length ? (todayProblems.filter((problem) => problem.completions?.some((progress) => progress.studentId?._id?.toString() === currentStudent._id?.toString() && progress.completedAt)).length / todayProblems.length) * 100 : 0}%` }}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                      <span>My Completed: {todayProblems.filter((problem) => problem.completions?.some((progress) => progress.studentId?._id?.toString() === currentStudent._id?.toString() && progress.completedAt)).length} / {todayProblems.length}</span>
+                      <span>Pending: {Math.max(todayProblems.length - todayProblems.filter((problem) => problem.completions?.some((progress) => progress.studentId?._id?.toString() === currentStudent._id?.toString() && progress.completedAt)).length, 0)}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
             <div>
               <div className="card">
@@ -196,39 +228,51 @@ const GroupPage = () => {
               const memberId = member._id?.toString();
               const memberIsCreator = memberId === creatorId;
               const isMe = memberId === currentStudent?._id?.toString();
+              const profileLink = `/groups/${groupId}/students/${memberId}`;
               return (
-                <div key={memberId} className="card" style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div className="avatar" style={{ background: member.avatarColor || '#6c63ff' }}>
-                    {member.initials || member.name?.[0]}
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div className="font-bold" style={{ color: 'var(--text-primary)' }}>
-                      {member.name}{isMe ? ' (you)' : ''}
+                <Link key={memberId} to={profileLink} style={{ textDecoration: 'none' }}>
+                  <div className="card" style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
+                    <div className="avatar" style={{ background: member.avatarColor || '#6c63ff' }}>
+                      {member.initials || member.name?.[0]}
                     </div>
-                    <div className="text-sm text-secondary">{member.email}</div>
+                    <div style={{ flex: 1 }}>
+                      <div className="font-bold" style={{ color: 'var(--text-primary)' }}>
+                        {member.name}{isMe ? ' (you)' : ''}
+                      </div>
+                      <div className="text-sm text-secondary">{member.email}</div>
+                    </div>
+                    {memberIsCreator && <span className="badge badge-purple">Creator</span>}
+                    {/* Creator or admin can kick non-creator members */}
+                    {isSignedIn && isCreator && !memberIsCreator && !isMe && (
+                      <button
+                        className="btn btn-outline btn-sm"
+                        style={{ color: 'var(--red)', borderColor: 'var(--red)' }}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          handleKick(memberId, member.name);
+                        }}
+                      >
+                        Remove
+                      </button>
+                    )}
+                    {/* Non-creator member can leave */}
+                    {isSignedIn && isMe && !memberIsCreator && (
+                      <button
+                        className="btn btn-outline btn-sm"
+                        style={{ color: 'var(--red)', borderColor: 'var(--red)' }}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          handleLeave();
+                        }}
+                      >
+                        Leave
+                      </button>
+                    )}
+                    <span style={{ color: 'var(--text-muted)', fontSize: '1.2rem' }}>›</span>
                   </div>
-                  {memberIsCreator && <span className="badge badge-purple">Creator</span>}
-                  {/* Creator or admin can kick non-creator members */}
-                  {isSignedIn && isCreator && !memberIsCreator && !isMe && (
-                    <button
-                      className="btn btn-outline btn-sm"
-                      style={{ color: 'var(--red)', borderColor: 'var(--red)' }}
-                      onClick={() => handleKick(memberId, member.name)}
-                    >
-                      Remove
-                    </button>
-                  )}
-                  {/* Non-creator member can leave */}
-                  {isSignedIn && isMe && !memberIsCreator && (
-                    <button
-                      className="btn btn-outline btn-sm"
-                      style={{ color: 'var(--red)', borderColor: 'var(--red)' }}
-                      onClick={handleLeave}
-                    >
-                      Leave
-                    </button>
-                  )}
-                </div>
+                </Link>
               );
             })}
           </div>

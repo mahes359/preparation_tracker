@@ -37,13 +37,14 @@ const StudentsPage = () => {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {students.map((student) => {
           const rankEntry = rankMap.get(student._id.toString());
+          const target = activeGroupId ? `/groups/${activeGroupId}/students/${student._id}` : `/students/${student._id}`;
           return (
             <Link
               key={student._id}
-              to={`/students/${student._id}`}
+              to={target}
               style={{ textDecoration: 'none' }}
             >
-              <div className="card" style={{ cursor: 'pointer' }}>
+              <div className="card" style={{ cursor: 'pointer', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
                 <div className="flex items-center gap-4">
                   <div
                     className="avatar avatar-lg"

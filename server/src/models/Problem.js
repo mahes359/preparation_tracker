@@ -62,6 +62,7 @@ const problemSchema = new mongoose.Schema(
 
 // Compound indexes for the most common query patterns
 problemSchema.index({ date: 1, studentId: 1 });
+problemSchema.index({ groupId: 1, challengeDate: 1 });
 // One problem per student per group per day (sparse allows null groupId rows)
 problemSchema.index({ challengeDate: 1, studentId: 1, groupId: 1 }, { unique: true, sparse: true });
 
